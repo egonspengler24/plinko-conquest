@@ -29,7 +29,7 @@ button {
   padding: 7px 14px; border-radius: 8px;
 }
 button:hover { border-color: #4a5070; }
-button:focus-visible, input:focus-visible, summary:focus-visible, .file-btn:focus-within {
+button:focus-visible, input:focus-visible, summary:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 button.primary {
@@ -72,11 +72,14 @@ summary:hover { color: var(--text); }
 }
 
 .music-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-.file-btn { display: inline-block; cursor: pointer; border: 1px solid var(--line); background: var(--panel-2); padding: 7px 14px; border-radius: 8px; }
-.file-btn:hover { border-color: #4a5070; }
-.file-btn input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-#musicName { margin: 0; }
-#musicName.has-track { color: var(--text); }
+#musicName { margin: 0; color: var(--text); }
+.credit a { color: var(--accent); }
+.credit a:hover { text-decoration: none; }
+select {
+  font: inherit; color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
+}
+select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .start-row { display: flex; justify-content: center; margin: 26px 0 10px; }
 
@@ -95,8 +98,11 @@ summary:hover { color: var(--text); }
 .stat { color: var(--muted); font-variant-numeric: tabular-nums; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; }
 .stat span { color: var(--text); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; background: transparent; padding: 7px 12px; }
-.seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.seg button, .seg .seg-file { border: 0; border-radius: 0; background: transparent; padding: 7px 12px; cursor: pointer; display: inline-block; }
+.seg button:hover, .seg .seg-file:hover { background: rgba(255,255,255,.06); }
+.seg button.on, .seg .seg-file.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.seg .seg-file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg .seg-file:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 input[type=range] { width: 90px; accent-color: var(--accent); }
 
 .game-body { display: flex; gap: 12px; align-items: flex-start; }

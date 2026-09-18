@@ -4,8 +4,11 @@
   const $ = (id) => document.getElementById(id);
   const TAU = Math.PI * 2;
   const DT = 1 / 60;            // fixed simulation step, seconds
-  const MAX_STEPS_PER_FRAME = 40;
+  const FRAME_BUDGET_MS = 12;   // stop simulating for this frame after this long, so fast-forward never freezes the page
+  const MAX_BOOST = 6;          // cap on the automatic endgame speed-up
   const STORE_KEY = 'plinko-conquest-names';
+  const SPEED_KEY = 'plinko-conquest-speed';
+  const DEFAULT_TRACK = 'assets/keep-it-real.mp3';
   const X2_COLOR = '#8cff00';
   const R_COLOR = '#ff0a84';
 
@@ -20,7 +23,7 @@
   let names = TEAMS.map((t) => t.label);
   let running = false;
   let paused = false;
-  let speed = 1;
+  let speed = 16;
   let acc = 0;
   let lastFrame = 0;
   let lastLeaderboard = 0;
@@ -28,10 +31,34 @@
   let winShown = false;
 
   // ---------------------------------------------------------------- music
-  const music = new Audio();
+  // Three sources: the bundled default track, a file the user picks, or nothing.
+  const music = new Audio(DEFAULT_TRACK);
   music.loop = true;
+  music.preload = 'auto';
   music.volume = Number($('volume').value);
-  let musicUrl = null;
+  let musicUrl = null;      // object URL for a user-chosen file
+  let musicMode = 'default'; // 'default' | 'custom' | 'none'
+
+  function releaseCustomFile() {
+    if (musicUrl) URL.revokeObjectURL(musicUrl);
+    musicUrl = null;
+    $('musicFile').value = '';
+  }
+
+  function setMusicMode(mode, label) {
+    musicMode = mode;
+    $('musicDefault').classList.toggle('on', mode === 'default');
+    $('musicFileLabel').classList.toggle('on', mode === 'custom');
+    $('musicNone').classList.toggle('on', mode === 'none');
+    $('musicName').textContent = mode === 'none' ? 'The game will be silent.' : label;
+  }
+  setMusicMode('default', 'Keep It Real (Nick Petrov)');
+
+  $('musicDefault').addEventListener('click', () => {
+    releaseCustomFile();
+    music.src = DEFAULT_TRACK;
+    setMusicMode('default', 'Keep It Real (Nick Petrov)');
+  });
 
   $('musicFile').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -39,21 +66,13 @@
     if (musicUrl) URL.revokeObjectURL(musicUrl);
     musicUrl = URL.createObjectURL(file);
     music.src = musicUrl;
-    $('musicName').textContent = file.name;
-    $('musicName').classList.add('has-track');
-    $('musicClear').hidden = false;
+    setMusicMode('custom', file.name);
   });
 
-  $('musicClear').addEventListener('click', () => {
+  $('musicNone').addEventListener('click', () => {
     music.pause();
-    music.removeAttribute('src');
-    music.load();
-    if (musicUrl) URL.revokeObjectURL(musicUrl);
-    musicUrl = null;
-    $('musicFile').value = '';
-    $('musicName').textContent = 'No track chosen. The game will be silent.';
-    $('musicName').classList.remove('has-track');
-    $('musicClear').hidden = true;
+    releaseCustomFile();
+    setMusicMode('none');
   });
 
   $('volume').addEventListener('input', (e) => { music.volume = Number(e.target.value); });
@@ -64,7 +83,7 @@
   });
 
   function playMusic(restart) {
-    if (!musicUrl) return;
+    if (musicMode === 'none') return;
     if (restart) music.currentTime = 0;
     music.play().catch(() => {});
   }
@@ -102,6 +121,14 @@
       inputs.push(input);
     });
   })();
+
+  try {
+    const saved = localStorage.getItem(SPEED_KEY);
+    if (saved && [...$('startSpeed').options].some((o) => o.value === saved)) $('startSpeed').value = saved;
+  } catch (_) { /* private mode */ }
+  $('startSpeed').addEventListener('change', () => {
+    try { localStorage.setItem(SPEED_KEY, $('startSpeed').value); } catch (_) { /* private mode */ }
+  });
 
   $('clearNames').addEventListener('click', () => {
     inputs.forEach((i) => { i.value = ''; });
@@ -154,6 +181,7 @@
     board.reset();
     peg.reset();
     paintAllCells();
+    setSpeed(Number($('startSpeed').value));
     acc = 0;
     paused = false;
     winShown = false;
@@ -199,11 +227,13 @@
     }
   });
 
+  function setSpeed(v) {
+    speed = v;
+    for (const b of $('speedSeg').children) b.classList.toggle('on', Number(b.dataset.speed) === v);
+  }
   $('speedSeg').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-speed]');
-    if (!btn) return;
-    speed = Number(btn.dataset.speed);
-    for (const b of $('speedSeg').children) b.classList.toggle('on', b === btn);
+    if (btn) setSpeed(Number(btn.dataset.speed));
   });
 
   $('fsBtn').addEventListener('click', () => {
@@ -218,15 +248,14 @@
     lastFrame = now;
 
     if (!paused) {
-      acc += real * speed;
-      let n = 0;
-      while (acc >= DT && n < MAX_STEPS_PER_FRAME) {
+      acc += real * speed * endgameBoost();
+      const started = performance.now();
+      while (acc >= DT) {
+        if (performance.now() - started > FRAME_BUDGET_MS) { acc = 0; break; } // fell behind: drop the backlog
         peg.step(DT);
         board.step(DT);
         acc -= DT;
-        n++;
       }
-      if (n === MAX_STEPS_PER_FRAME) acc = 0;
     }
 
     if (board.winner >= 0 && !winShown) {
@@ -265,11 +294,11 @@
     fctx.clearRect(0, 0, board.widthPx, board.heightPx);
 
     for (const im of board.impacts) {
-      const k = im.t / 0.4;
-      fctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`;
-      fctx.lineWidth = 3;
+      const k = im.t / 0.3;
+      fctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.7})`;
+      fctx.lineWidth = 2;
       fctx.beginPath();
-      fctx.arc(im.x, im.y, board.splashRadius * C * (0.3 + 0.7 * k), 0, TAU);
+      fctx.arc(im.x, im.y, 8 + 26 * k, 0, TAU);
       fctx.stroke();
     }
 
@@ -280,12 +309,12 @@
       fctx.globalAlpha = 0.45;
       fctx.lineWidth = 6;
       fctx.beginPath();
-      fctx.moveTo(s.x - s.vx * 0.035, s.y - s.vy * 0.035);
+      fctx.moveTo(s.x - s.vx * 0.02, s.y - s.vy * 0.02);
       fctx.lineTo(s.x, s.y);
       fctx.stroke();
       fctx.globalAlpha = 1;
       fctx.beginPath();
-      fctx.arc(s.x, s.y, 6, 0, TAU);
+      fctx.arc(s.x, s.y, 5, 0, TAU);
       fctx.fillStyle = color;
       fctx.fill();
       fctx.lineWidth = 2;
@@ -299,7 +328,7 @@
   }
 
   function drawCannon(i) {
-    const c = board.cannon[i], a = board.angle[i], bright = TEAMS[i].bright, f = board.flash[i];
+    const c = board.cannon[i], a = board.angle, bright = TEAMS[i].bright, f = board.flash[i];
     fctx.save();
     fctx.translate(c.x, c.y);
     if (f.t > 0) {
@@ -365,11 +394,21 @@
   // ---------------------------------------------------------------- leaderboard, clock, winner
   function fmtTime(sec) {
     const s = Math.floor(sec);
-    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    const mmss = `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+    return h ? `${h}:${mmss}` : mmss;
   }
+  // Eliminated colours take their balls off the board, which slows the endgame to a crawl.
+  // Speed the game up as colours drop out so the total number of shots per second stays roughly constant.
+  function endgameBoost() {
+    return Math.min(MAX_BOOST, Math.max(1, board.teamCount / Math.max(1, board.aliveCount)));
+  }
+
   function updateClock() {
     $('clock').textContent = fmtTime(board.time);
-    $('blast').textContent = board.splashRadius.toFixed(1);
+    const boost = board.winner >= 0 ? 1 : endgameBoost();
+    $('boostStat').hidden = boost < 1.05;
+    $('boost').textContent = boost.toFixed(1);
   }
 
   function updateLeaderboard() {

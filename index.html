@@ -38,14 +38,28 @@
   <section aria-labelledby="musicHeading" class="music">
     <h2 id="musicHeading">Background music</h2>
     <div class="music-row">
-      <label class="file-btn">
-        <input type="file" id="musicFile" accept="audio/*">
-        <span>Choose audio file</span>
-      </label>
-      <span id="musicName" class="hint">No track chosen. The game will be silent.</span>
-      <button type="button" class="ghost" id="musicClear" hidden>Remove</button>
+      <div class="seg" role="group" aria-label="Music source">
+        <button type="button" id="musicDefault" class="on">Default track</button>
+        <label class="seg-file" id="musicFileLabel"><input type="file" id="musicFile" accept="audio/*"><span>Choose file…</span></label>
+        <button type="button" id="musicNone">No music</button>
+      </div>
+      <span id="musicName" class="hint"></span>
     </div>
-    <p class="hint">The file stays on your computer; nothing is uploaded.</p>
+    <p class="hint">Your own file stays on your computer; nothing is uploaded.</p>
+    <p class="hint credit">Default track: &ldquo;Keep It Real&rdquo; by Nick Petrov. Music from <a href="https://www.bensound.com" target="_blank" rel="noopener">Bensound.com</a>.</p>
+  </section>
+
+  <section aria-labelledby="speedHeading">
+    <h2 id="speedHeading">Starting speed</h2>
+    <div class="music-row">
+      <select id="startSpeed" aria-label="Starting speed">
+        <option value="1">1× (real time)</option>
+        <option value="4">4×</option>
+        <option value="16" selected>16× (fast forward)</option>
+        <option value="64">64× (blitz)</option>
+      </select>
+    </div>
+    <p class="hint">Every shot takes just one square, so a full game at 1× can take an hour or more. You can change the speed at any time while playing.</p>
   </section>
 
   <div class="start-row">
@@ -55,12 +69,12 @@
   <details class="howto">
     <summary>How it plays</summary>
     <ul>
-      <li>Every colour starts with its own block of squares and a spinning cannon showing a number, which starts at <b>1</b>.</li>
+      <li>Every colour starts with its own block of squares and a spinning cannon showing a number, which starts at <b>1</b>. All the cannons turn together at the same constant rate.</li>
       <li>Every colour has one ball on the plinko board. When it reaches the bottom it lands on <b class="x2">x2</b> or <b class="r">R</b>, then drops in again.</li>
       <li><b class="x2">x2</b> doubles that colour's number (1, 2, 4, 8, 16…).</li>
-      <li><b class="r">R</b> releases the cannon. It fires that many shots in the direction the barrel is pointing, then the number resets to 1.</li>
-      <li>A shot flies until it hits a square that isn't its own and paints a blob of squares its colour.</li>
-      <li>A colour with no squares left is out. The last colour standing wins. The longer the game runs, the bigger the blobs get, so it always ends.</li>
+      <li><b class="r">R</b> releases the cannon. It fires that many shots in the direction the barrel is pointing at that moment, then the number resets to 1.</li>
+      <li>Each shot takes exactly <b>one square</b>: the first square it meets that isn't its own colour. So a stack of 8 takes 8 squares.</li>
+      <li>A colour with no squares left is out. The last colour standing wins.</li>
     </ul>
   </details>
 </main>
@@ -71,15 +85,15 @@
     <div class="topbar-left">
       <strong class="brand">Plinko Conquest</strong>
       <span class="stat" title="Game time"><span id="clock">00:00</span></span>
-      <span class="stat" title="Blast size grows the longer the game runs">Blast <span id="blast">4.0</span></span>
+      <span class="stat" id="boostStat" title="The game speeds up automatically as colours are eliminated" hidden>Endgame ×<span id="boost">1.0</span></span>
     </div>
     <div class="topbar-right">
       <button type="button" id="pauseBtn" class="ghost">Pause</button>
       <div class="seg" role="group" aria-label="Game speed" id="speedSeg">
-        <button type="button" data-speed="1" class="on">1×</button>
-        <button type="button" data-speed="2">2×</button>
+        <button type="button" data-speed="1">1×</button>
         <button type="button" data-speed="4">4×</button>
-        <button type="button" data-speed="8">8×</button>
+        <button type="button" data-speed="16">16×</button>
+        <button type="button" data-speed="64">64×</button>
       </div>
       <button type="button" id="muteBtn" class="ghost" aria-pressed="false">Sound on</button>
       <input type="range" id="volume" min="0" max="1" step="0.01" value="0.6" aria-label="Music volume">

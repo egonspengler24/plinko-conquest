@@ -1,4 +1,10 @@
 // Pure game logic for the territory grid, cannons and shots. No DOM access, so it can be tested in Node.
+//
+// Rules (matched to the reference video):
+//  - every cannon spins at the same constant rate, in sync
+//  - x2 doubles a colour's number; R fires that many shots, then the number resets to 1
+//  - a burst leaves along the barrel's current direction; each shot captures exactly ONE square:
+//    the first square it meets that isn't its own colour
 
 const BOARD_CFG = {
   cols: 120,          // 6 blocks x 20 cells
@@ -6,15 +12,11 @@ const BOARD_CFG = {
   blocksX: 6,
   blocksY: 4,
   cellPx: 14,
-  spinRate: 1.8,      // cannon rotation, radians per second (all cannons identical)
-  shotSpeed: 780,     // px per second
-  shotInterval: 0.07, // seconds between shots when releasing a stack
-  shotGrace: 28,      // px a shot ignores foreign squares after leaving the cannon
-  splashBase: 4,      // cells; each impact captures a ragged blob around this radius
-  splashMax: 20,
-  escalateAfter: 30,  // seconds of play before splashes start to grow, so the endgame always finishes
-  escalatePerMin: 6,  // cells of extra splash radius per minute after that
-  shotLife: 8,        // seconds before a shot gives up
+  spinRate: 2.1,      // radians per second, clockwise; about one turn every 3 seconds
+  shotSpeed: 3000,    // px per second (shots are near-instant streaks)
+  shotInterval: 0.01, // seconds between shots in a burst
+  shotGrace: 20,      // px a shot ignores foreign squares after leaving the cannon
+  shotLife: 4,        // seconds before a shot gives up
 };
 
 class Board {
@@ -25,7 +27,6 @@ class Board {
     this.heightPx = this.rows * this.cellPx;
     this.owner = new Uint8Array(this.cols * this.rows);
     this.onEliminate = null; // (team) => void
-    this.onImpact = null;    // ({x, y, team, cells}) => void
     this.reset();
   }
 
@@ -41,20 +42,19 @@ class Board {
     this.mult = new Array(n).fill(1);
     this.queued = new Array(n).fill(0);
     this.cool = new Array(n).fill(0);
-    this.angle = Array.from({ length: n }, () => Math.random() * Math.PI * 2);
     this.alive = new Array(n).fill(true);
     this.flash = Array.from({ length: n }, () => ({ kind: null, t: 0 }));
     this.cannon = Array.from({ length: n }, (_, i) => ({
       x: ((i % this.blocksX) * bw + bw / 2) * this.cellPx,
       y: (Math.floor(i / this.blocksX) * bh + bh / 2) * this.cellPx,
     }));
+    this.angle = Math.random() * Math.PI * 2; // shared by every cannon
     this.shots = [];
     this.dirty = [];      // cell indices changed since the renderer last drained
     this.impacts = [];    // recent impact effects for the renderer
     this.aliveCount = n;
     this.winner = -1;
     this.time = 0;
-    this.splashRadius = this.splashBase;
   }
 
   // --- ball events from the pegboard -------------------------------------------------
@@ -76,11 +76,9 @@ class Board {
 
   step(dt) {
     if (this.winner < 0) this.time += dt;
-    const extra = Math.max(0, (this.time - this.escalateAfter) / 60) * this.escalatePerMin;
-    this.splashRadius = Math.min(this.splashMax, this.splashBase + extra);
+    this.angle = (this.angle + this.spinRate * dt) % (Math.PI * 2);
     for (let i = 0; i < this.teamCount; i++) {
       if (!this.alive[i]) continue;
-      this.angle[i] = (this.angle[i] + this.spinRate * dt) % (Math.PI * 2);
       if (this.flash[i].t > 0) this.flash[i].t = Math.max(0, this.flash[i].t - dt * 3);
       if (this.cool[i] > 0) this.cool[i] -= dt;
       while (this.queued[i] > 0 && this.cool[i] <= 0) {
@@ -91,34 +89,35 @@ class Board {
       if (this.queued[i] === 0 && this.cool[i] < 0) this.cool[i] = 0;
     }
     this.moveShots(dt);
-    for (const im of this.impacts) im.t += dt;
-    this.impacts = this.impacts.filter((im) => im.t < 0.4);
+    if (this.impacts.length) {
+      for (const im of this.impacts) im.t += dt;
+      this.impacts = this.impacts.filter((im) => im.t < 0.3);
+    }
   }
 
   fire(team) {
-    const a = this.angle[team];
     const c = this.cannon[team];
     this.shots.push({
       team,
       x: c.x, y: c.y,
-      vx: Math.cos(a) * this.shotSpeed,
-      vy: Math.sin(a) * this.shotSpeed,
+      vx: Math.cos(this.angle) * this.shotSpeed,
+      vy: Math.sin(this.angle) * this.shotSpeed,
       travelled: 0,
       age: 0,
     });
   }
 
   moveShots(dt) {
+    if (!this.shots.length) return;
     const survivors = [];
     for (const s of this.shots) {
       if (!this.alive[s.team]) continue;
       s.age += dt;
       const dist = this.shotSpeed * dt;
       const sub = Math.ceil(dist / (this.cellPx / 2));
-      const sx = (s.vx * dt) / sub, sy = (s.vy * dt) / sub;
       let hit = false;
       for (let k = 0; k < sub && !hit; k++) {
-        s.x += sx; s.y += sy;
+        s.x += (s.vx * dt) / sub; s.y += (s.vy * dt) / sub; // velocity may flip on a wall bounce
         s.travelled += dist / sub;
         // bounce off the outer walls so a shot is never wasted
         if (s.x < 0) { s.x = -s.x; s.vx = -s.vx; }
@@ -137,30 +136,16 @@ class Board {
     this.shots = survivors;
   }
 
+  // One shot takes exactly one square.
   capture(cx, cy, team) {
-    const R = this.splashRadius, reach = Math.ceil(R + 1);
-    const changed = [];
-    for (let dy = -reach; dy <= reach; dy++) {
-      for (let dx = -reach; dx <= reach; dx++) {
-        const x = cx + dx, y = cy + dy;
-        if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) continue;
-        const thr = R - 0.6 + Math.random() * 1.2;
-        if (dx * dx + dy * dy > thr * thr) continue;
-        const idx = y * this.cols + x;
-        const prev = this.owner[idx];
-        if (prev === team) continue;
-        this.owner[idx] = team;
-        this.count[prev]--;
-        this.count[team]++;
-        this.dirty.push(idx);
-        changed.push(prev);
-      }
-    }
+    const idx = cy * this.cols + cx;
+    const prev = this.owner[idx];
+    this.owner[idx] = team;
+    this.count[prev]--;
+    this.count[team]++;
+    this.dirty.push(idx);
     this.impacts.push({ x: (cx + 0.5) * this.cellPx, y: (cy + 0.5) * this.cellPx, team, t: 0 });
-    if (this.onImpact) this.onImpact({ x: cx, y: cy, team });
-    for (const t of new Set(changed)) {
-      if (this.alive[t] && this.count[t] <= 0) this.eliminate(t);
-    }
+    if (this.alive[prev] && this.count[prev] <= 0) this.eliminate(prev);
   }
 
   eliminate(team) {
