@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plinko Conquest</title>
+<meta name="description" content="24 colours fight for the board. Drop balls, build multipliers, fire cannons, and be the last colour standing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%238cff00'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%23111'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<main id="setup" class="screen">
+  <header class="hero">
+    <h1>Plinko Conquest</h1>
+    <p>Name your colours, pick a soundtrack, and let the balls decide who owns the board.</p>
+  </header>
+
+  <section aria-labelledby="namesHeading">
+    <div class="section-head">
+      <h2 id="namesHeading">Name the squares</h2>
+      <div class="tools">
+        <button type="button" class="ghost" id="shuffleNames">Shuffle names</button>
+        <button type="button" class="ghost" id="clearNames">Clear all</button>
+      </div>
+    </div>
+    <div id="teamGrid" class="team-grid"></div>
+    <details class="paste">
+      <summary>Paste a list of names instead</summary>
+      <p class="hint">One name per line. They fill the squares in order, left to right, top to bottom.</p>
+      <textarea id="pasteBox" rows="6" placeholder="Alice&#10;Bob&#10;Carol"></textarea>
+      <button type="button" id="applyPaste">Fill names</button>
+    </details>
+    <p class="hint">Blank squares use their colour name (Purple, Forest, Teal…).</p>
+  </section>
+
+  <section aria-labelledby="musicHeading" class="music">
+    <h2 id="musicHeading">Background music</h2>
+    <div class="music-row">
+      <label class="file-btn">
+        <input type="file" id="musicFile" accept="audio/*">
+        <span>Choose audio file</span>
+      </label>
+      <span id="musicName" class="hint">No track chosen. The game will be silent.</span>
+      <button type="button" class="ghost" id="musicClear" hidden>Remove</button>
+    </div>
+    <p class="hint">The file stays on your computer; nothing is uploaded.</p>
+  </section>
+
+  <div class="start-row">
+    <button type="button" id="startBtn" class="primary">Start game</button>
+  </div>
+
+  <details class="howto">
+    <summary>How it plays</summary>
+    <ul>
+      <li>Every colour starts with its own block of squares and a spinning cannon showing a number, which starts at <b>1</b>.</li>
+      <li>Every colour has one ball on the plinko board. When it reaches the bottom it lands on <b class="x2">x2</b> or <b class="r">R</b>, then drops in again.</li>
+      <li><b class="x2">x2</b> doubles that colour's number (1, 2, 4, 8, 16…).</li>
+      <li><b class="r">R</b> releases the cannon. It fires that many shots in the direction the barrel is pointing, then the number resets to 1.</li>
+      <li>A shot flies until it hits a square that isn't its own and paints a blob of squares its colour.</li>
+      <li>A colour with no squares left is out. The last colour standing wins. The longer the game runs, the bigger the blobs get, so it always ends.</li>
+    </ul>
+  </details>
+</main>
+
+<!-- ============ GAME ============ -->
+<main id="game" class="screen" hidden>
+  <div class="topbar">
+    <div class="topbar-left">
+      <strong class="brand">Plinko Conquest</strong>
+      <span class="stat" title="Game time"><span id="clock">00:00</span></span>
+      <span class="stat" title="Blast size grows the longer the game runs">Blast <span id="blast">4.0</span></span>
+    </div>
+    <div class="topbar-right">
+      <button type="button" id="pauseBtn" class="ghost">Pause</button>
+      <div class="seg" role="group" aria-label="Game speed" id="speedSeg">
+        <button type="button" data-speed="1" class="on">1×</button>
+        <button type="button" data-speed="2">2×</button>
+        <button type="button" data-speed="4">4×</button>
+        <button type="button" data-speed="8">8×</button>
+      </div>
+      <button type="button" id="muteBtn" class="ghost" aria-pressed="false">Sound on</button>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.6" aria-label="Music volume">
+      <button type="button" id="fsBtn" class="ghost">Fullscreen</button>
+      <button type="button" id="backBtn" class="ghost">Setup</button>
+    </div>
+  </div>
+
+  <div class="game-body">
+    <div id="stageWrap" class="stage-wrap">
+      <div id="stage" class="stage">
+        <div class="board-wrap">
+          <canvas id="gridCanvas" width="1680" height="1120"></canvas>
+          <canvas id="fxCanvas" width="1680" height="1120"></canvas>
+        </div>
+        <canvas id="pegCanvas" width="320" height="1120"></canvas>
+        <div id="toasts" class="toasts" aria-live="polite"></div>
+        <div id="pauseBadge" class="pause-badge" hidden>Paused</div>
+        <div id="winOverlay" class="win" hidden>
+          <div class="win-card" id="winCard">
+            <div class="win-kicker">Winner</div>
+            <div class="win-name" id="winName"></div>
+            <div class="win-sub" id="winSub"></div>
+            <div class="win-actions">
+              <button type="button" id="againBtn" class="primary">Play again</button>
+              <button type="button" id="editBtn" class="ghost">Edit names</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="leaderboard" aria-label="Leaderboard">
+      <h2>Leaderboard</h2>
+      <ol id="lbList"></ol>
+    </aside>
+  </div>
+</main>
+
+<script src="vendor/matter.min.js"></script>
+<script src="js/teams.js"></script>
+<script src="js/board.js"></script>
+<script src="js/pegboard.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
