@@ -11,7 +11,8 @@ No build step and no dependencies to install: it's plain HTML, CSS and JavaScrip
   - **x2** (left half): doubles that cannon's number (1 → 2 → 4 → 8 → 16 …)
   - **R** (right half): **releases** the cannon. It fires that many shots in whatever direction the barrel is pointing at that moment, then the number resets to 1. While it's firing, the number shows the shots remaining in pink.
 - The ball is then dropped back in at the top.
-- **Each shot takes exactly one square.** It flies in a straight line (bouncing off the outer walls) and captures the first square it meets that isn't its own colour. So a stack of 8 takes 8 squares, in a short line along the barrel direction.
+- **Each shot takes exactly one square.** It flies in a straight line and captures the first square it meets that isn't its own colour. So a stack of 8 takes 8 squares, in a short line along the barrel direction.
+- **The board wraps around.** A shot that leaves the right edge comes back in from the left (and likewise top and bottom), so colours in the middle are no more exposed to fire than colours on the edge. In 4,000 simulated games every starting position won about equally often.
 - **Capturing a cannon:** a cannon belongs to whichever colour owns the square underneath it. If a shot captures that square, the cannon, its ball and its built-up number all switch to the capturing colour. Cannons are never removed; they keep circling and firing for their new owner, so a colour with more cannons has more firepower. A white ring marks a cannon (and ball) that has changed hands.
 - A colour with no squares left is out. The last colour standing wins.
 

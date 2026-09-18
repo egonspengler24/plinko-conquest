@@ -8,6 +8,8 @@
 //  - x2 doubles a cannon's number; R fires that many shots, then the number resets to 1.
 //  - A burst leaves along the barrel's current direction; each shot captures exactly ONE square:
 //    the first square it meets that isn't its own colour.
+//  - The board wraps around: a shot leaving one edge re-enters from the opposite edge, so colours in the
+//    middle are no more exposed to fire than colours on the edge.
 //  - A colour with no squares left is out. The last colour standing wins.
 //
 // "team" always means a colour (0..23, the original owner of that block); "cannon" is an index 0..23 too,
@@ -23,6 +25,7 @@ const BOARD_CFG = {
   shotSpeed: 3000,    // px per second (shots are near-instant streaks)
   shotInterval: 0.01, // seconds between shots in a burst
   shotLife: 4,        // seconds before a shot gives up
+  wrapEdges: true,    // shots leave one edge and re-enter from the opposite one (false: bounce off the walls)
 };
 
 class Board {
@@ -138,12 +141,16 @@ class Board {
       const sub = Math.ceil(dist / (this.cellPx / 2));
       let hit = false;
       for (let k = 0; k < sub && !hit; k++) {
-        s.x += (s.vx * dt) / sub; s.y += (s.vy * dt) / sub; // velocity may flip on a wall bounce
-        // bounce off the outer walls so a shot is never wasted
-        if (s.x < 0) { s.x = -s.x; s.vx = -s.vx; }
-        else if (s.x >= this.widthPx) { s.x = 2 * this.widthPx - s.x - 0.01; s.vx = -s.vx; }
-        if (s.y < 0) { s.y = -s.y; s.vy = -s.vy; }
-        else if (s.y >= this.heightPx) { s.y = 2 * this.heightPx - s.y - 0.01; s.vy = -s.vy; }
+        s.x += (s.vx * dt) / sub; s.y += (s.vy * dt) / sub;
+        if (this.wrapEdges) {
+          if (s.x < 0) s.x += this.widthPx; else if (s.x >= this.widthPx) s.x -= this.widthPx;
+          if (s.y < 0) s.y += this.heightPx; else if (s.y >= this.heightPx) s.y -= this.heightPx;
+        } else {
+          if (s.x < 0) { s.x = -s.x; s.vx = -s.vx; }
+          else if (s.x >= this.widthPx) { s.x = 2 * this.widthPx - s.x - 0.01; s.vx = -s.vx; }
+          if (s.y < 0) { s.y = -s.y; s.vy = -s.vy; }
+          else if (s.y >= this.heightPx) { s.y = 2 * this.heightPx - s.y - 0.01; s.vy = -s.vy; }
+        }
         const cx = Math.floor(s.x / this.cellPx), cy = Math.floor(s.y / this.cellPx);
         if (this.owner[cy * this.cols + cx] !== s.team) {
           this.capture(cx, cy, s.team);
