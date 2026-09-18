@@ -1,6 +1,6 @@
 // The plinko board on the right-hand side, powered by Matter.js.
-// One ball per team. A ball that reaches the bottom bar triggers x2 (left half) or R (right half)
-// for its team and is dropped back in at the top.
+// One ball per cannon. A ball that reaches the bottom bar triggers x2 (left half) or R (right half)
+// for its cannon and is dropped back in at the top.
 
 const PEG_CFG = {
   width: 320,
@@ -49,7 +49,7 @@ class Pegboard {
 
   reset() {
     const { Bodies, Composite, Body } = Matter;
-    for (const b of this.balls) if (b) Composite.remove(this.engine.world, b);
+    for (const b of this.balls) Composite.remove(this.engine.world, b);
     this.balls = [];
     for (let i = 0; i < this.teamCount; i++) {
       const ball = Bodies.circle(0, 0, this.ballR, {
@@ -72,19 +72,11 @@ class Pegboard {
     ball.stillSteps = 0;
   }
 
-  remove(team) {
-    const b = this.balls[team];
-    if (!b) return;
-    Matter.Composite.remove(this.engine.world, b);
-    this.balls[team] = null;
-  }
-
   step(dt) {
     const { Engine, Body } = Matter;
     for (let s = 0; s < this.substeps; s++) Engine.update(this.engine, (dt * 1000) / this.substeps);
     for (const k of ['x2', 'R']) if (this.barFlash[k] > 0) this.barFlash[k] = Math.max(0, this.barFlash[k] - dt * 4);
     for (const ball of this.balls) {
-      if (!ball) continue;
       const { x, y } = ball.position;
       if (y + this.ballR >= this.barTop - 2) {
         const kind = x < this.width / 2 ? 'x2' : 'R';
@@ -102,8 +94,8 @@ class Pegboard {
     }
   }
 
-  // Draws the board. `colorOf(team)` supplies the ball colour.
-  draw(ctx, colorOf, mult) {
+  // Draws the board. `styleOf(ball)` returns { fill, ring }: the ball colour, and whether to outline it in white.
+  draw(ctx, styleOf) {
     const W = this.width, H = this.height;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
@@ -126,13 +118,14 @@ class Pegboard {
     this.drawWheel(ctx, mid, this.barTop + this.barH / 2 + 4, 22);
     // balls
     for (const ball of this.balls) {
-      if (!ball || ball.position.y < -this.ballR) continue;
+      if (ball.position.y < -this.ballR) continue;
       ctx.beginPath();
       ctx.arc(ball.position.x, ball.position.y, this.ballR, 0, Math.PI * 2);
-      ctx.fillStyle = colorOf(ball.team);
+      const st = styleOf(ball.team);
+      ctx.fillStyle = st.fill;
       ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = st.ring ? 3 : 2;
+      ctx.strokeStyle = st.ring ? '#fff' : 'rgba(0,0,0,0.55)';
       ctx.stroke();
     }
   }

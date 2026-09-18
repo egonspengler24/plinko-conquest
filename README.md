@@ -6,19 +6,20 @@ No build step and no dependencies to install: it's plain HTML, CSS and JavaScrip
 
 ## How it plays
 
-- Every colour starts with a 20×20 block of squares and a cannon. All cannons spin together, clockwise, at the same constant rate (one turn about every 3 seconds). The number under each cannon starts at **1**.
-- Each colour has one ball on the plinko board (right). When a ball reaches the bottom it lands on:
-  - **x2** (left half): doubles that colour's number (1 → 2 → 4 → 8 → 16 …)
+- There are 24 cannons, one on the middle square of each starting block. Every cannon has its own plinko ball and its own number, which starts at **1**. All cannons spin together, clockwise, at the same constant rate (one turn about every 3 seconds).
+- Each ball drops down the plinko board (right). When it reaches the bottom it lands on:
+  - **x2** (left half): doubles that cannon's number (1 → 2 → 4 → 8 → 16 …)
   - **R** (right half): **releases** the cannon. It fires that many shots in whatever direction the barrel is pointing at that moment, then the number resets to 1. While it's firing, the number shows the shots remaining in pink.
 - The ball is then dropped back in at the top.
 - **Each shot takes exactly one square.** It flies in a straight line (bouncing off the outer walls) and captures the first square it meets that isn't its own colour. So a stack of 8 takes 8 squares, in a short line along the barrel direction.
-- A colour with no squares left is eliminated and its ball leaves the board. Last colour standing wins.
+- **Capturing a cannon:** a cannon belongs to whichever colour owns the square underneath it. If a shot captures that square, the cannon, its ball and its built-up number all switch to the capturing colour. Cannons are never removed; they keep circling and firing for their new owner, so a colour with more cannons has more firepower. A white ring marks a cannon (and ball) that has changed hands.
+- A colour with no squares left is out. The last colour standing wins.
 
 ## Setting up a game
 
 - Type a name into each of the 24 coloured fields (or use *Paste a list of names*). Blank fields fall back to the colour name. Names are remembered in your browser.
 - **Music:** a default track is bundled (see credit below). You can switch to *Choose file…* to play your own audio file (it stays on your computer and is never uploaded), or pick *No music*.
-- **Speed:** with one square per shot a full game at 1× can take an hour or more, so the game starts at 16× by default. Switch between 1×, 4×, 16× and 64× at any time, both on the setup screen and in game. As colours are eliminated their balls leave the board and the game would slow to a crawl, so it also speeds itself up automatically (up to 6×, shown as *Endgame ×N*). The rules never change, it just plays faster.
+- **Speed:** a typical game takes around 25 minutes at 1× (it snowballs as colours capture each other's cannons), so you can start at 1×, 2×, 4×, 8× or 16× and change it at any time in game.
 - In game: pause (Space), sound on/off and volume, fullscreen.
 
 ## Run locally
@@ -31,7 +32,7 @@ python3 -m http.server 8000
 
 ## Tuning
 
-Game balance lives at the top of [`js/board.js`](js/board.js) (`BOARD_CFG`): cannon spin rate, shot speed and burst spacing. The plinko layout is in [`js/pegboard.js`](js/pegboard.js) (`PEG_CFG`), and the colours in [`js/teams.js`](js/teams.js).
+Game balance lives at the top of [`js/board.js`](js/board.js) (`BOARD_CFG`): cannon spin rate, shot speed and burst spacing. The plinko cycle time (about 5 seconds per ball) sets the overall pace. The plinko layout is in [`js/pegboard.js`](js/pegboard.js) (`PEG_CFG`), and the colours in [`js/teams.js`](js/teams.js).
 
 `js/board.js` has no DOM access, so the game rules can be simulated headlessly with Node.
 

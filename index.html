@@ -53,13 +53,14 @@
     <h2 id="speedHeading">Starting speed</h2>
     <div class="music-row">
       <select id="startSpeed" aria-label="Starting speed">
-        <option value="1">1× (real time)</option>
+        <option value="1" selected>1× (real time)</option>
+        <option value="2">2×</option>
         <option value="4">4×</option>
-        <option value="16" selected>16× (fast forward)</option>
-        <option value="64">64× (blitz)</option>
+        <option value="8">8×</option>
+        <option value="16">16× (fast forward)</option>
       </select>
     </div>
-    <p class="hint">Every shot takes just one square, so a full game at 1× can take an hour or more. You can change the speed at any time while playing.</p>
+    <p class="hint">A typical game takes around 25 minutes at 1×, and it can run longer or shorter. You can change the speed at any time while playing.</p>
   </section>
 
   <div class="start-row">
@@ -70,10 +71,11 @@
     <summary>How it plays</summary>
     <ul>
       <li>Every colour starts with its own block of squares and a spinning cannon showing a number, which starts at <b>1</b>. All the cannons turn together at the same constant rate.</li>
-      <li>Every colour has one ball on the plinko board. When it reaches the bottom it lands on <b class="x2">x2</b> or <b class="r">R</b>, then drops in again.</li>
-      <li><b class="x2">x2</b> doubles that colour's number (1, 2, 4, 8, 16…).</li>
+      <li>Every cannon has its own ball on the plinko board. When it reaches the bottom it lands on <b class="x2">x2</b> or <b class="r">R</b>, then drops in again.</li>
+      <li><b class="x2">x2</b> doubles that cannon's number (1, 2, 4, 8, 16…).</li>
       <li><b class="r">R</b> releases the cannon. It fires that many shots in the direction the barrel is pointing at that moment, then the number resets to 1.</li>
       <li>Each shot takes exactly <b>one square</b>: the first square it meets that isn't its own colour. So a stack of 8 takes 8 squares.</li>
+      <li>If a shot captures the square <b>under another cannon</b>, that cannon (and its ball, and its built-up number) switches to the capturing colour. Cannons are never removed: they keep circling and firing for their new owner. A white ring marks a cannon that has changed hands.</li>
       <li>A colour with no squares left is out. The last colour standing wins.</li>
     </ul>
   </details>
@@ -85,15 +87,15 @@
     <div class="topbar-left">
       <strong class="brand">Plinko Conquest</strong>
       <span class="stat" title="Game time"><span id="clock">00:00</span></span>
-      <span class="stat" id="boostStat" title="The game speeds up automatically as colours are eliminated" hidden>Endgame ×<span id="boost">1.0</span></span>
     </div>
     <div class="topbar-right">
       <button type="button" id="pauseBtn" class="ghost">Pause</button>
       <div class="seg" role="group" aria-label="Game speed" id="speedSeg">
         <button type="button" data-speed="1">1×</button>
+        <button type="button" data-speed="2">2×</button>
         <button type="button" data-speed="4">4×</button>
+        <button type="button" data-speed="8">8×</button>
         <button type="button" data-speed="16">16×</button>
-        <button type="button" data-speed="64">64×</button>
       </div>
       <button type="button" id="muteBtn" class="ghost" aria-pressed="false">Sound on</button>
       <input type="range" id="volume" min="0" max="1" step="0.01" value="0.6" aria-label="Music volume">

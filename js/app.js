@@ -5,7 +5,6 @@
   const TAU = Math.PI * 2;
   const DT = 1 / 60;            // fixed simulation step, seconds
   const FRAME_BUDGET_MS = 12;   // stop simulating for this frame after this long, so fast-forward never freezes the page
-  const MAX_BOOST = 6;          // cap on the automatic endgame speed-up
   const STORE_KEY = 'plinko-conquest-names';
   const SPEED_KEY = 'plinko-conquest-speed';
   const DEFAULT_TRACK = 'assets/keep-it-real.mp3';
@@ -23,7 +22,7 @@
   let names = TEAMS.map((t) => t.label);
   let running = false;
   let paused = false;
-  let speed = 16;
+  let speed = 1;
   let acc = 0;
   let lastFrame = 0;
   let lastLeaderboard = 0;
@@ -167,9 +166,9 @@
   }
 
   // ---------------------------------------------------------------- game lifecycle
-  board.onEliminate = (team) => {
-    peg.remove(team);
-    toast(`${names[team]} is out`, TEAMS[team].bright);
+  board.onEliminate = (team) => toast(`${names[team]} is out`, TEAMS[team].bright);
+  board.onCannonCaptured = (cannon, from, to) => {
+    toast(`${names[to]} captured a cannon from ${names[from]}`, TEAMS[to].bright);
   };
   peg.onLand = (team, kind) => {
     if (kind === 'x2') board.doubleMultiplier(team);
@@ -248,7 +247,7 @@
     lastFrame = now;
 
     if (!paused) {
-      acc += real * speed * endgameBoost();
+      acc += real * speed;
       const started = performance.now();
       while (acc >= DT) {
         if (performance.now() - started > FRAME_BUDGET_MS) { acc = 0; break; } // fell behind: drop the backlog
@@ -265,7 +264,10 @@
 
     for (const idx of board.drainDirty()) paintCell(idx);
     drawFx();
-    peg.draw(pctx, (t) => TEAMS[t].bright);
+    peg.draw(pctx, (i) => {
+      const owner = board.ownerOf(i);
+      return { fill: TEAMS[owner].bright, ring: owner !== i };
+    });
 
     if (now - lastLeaderboard > 250) {
       lastLeaderboard = now;
@@ -322,18 +324,17 @@
       fctx.stroke();
     }
 
-    for (let i = 0; i < board.teamCount; i++) {
-      if (board.alive[i]) { drawCannon(i); drawLabels(i); }
-    }
+    for (let i = 0; i < board.teamCount; i++) { drawCannon(i); drawLabels(i); }
   }
 
   function drawCannon(i) {
-    const c = board.cannon[i], a = board.angle, bright = TEAMS[i].bright, f = board.flash[i];
+    const c = board.cannon[i], a = board.angle, owner = board.ownerOf(i), bright = TEAMS[owner].bright, f = board.flash[i];
+    const captured = owner !== i;
     fctx.save();
     fctx.translate(c.x, c.y);
     if (f.t > 0) {
       fctx.globalAlpha = f.t;
-      fctx.strokeStyle = f.kind === 'x2' ? X2_COLOR : R_COLOR;
+      fctx.strokeStyle = f.kind === 'x2' ? X2_COLOR : f.kind === 'R' ? R_COLOR : '#fff';
       fctx.lineWidth = 3 + 7 * f.t;
       fctx.beginPath();
       fctx.arc(0, 0, 24 + (1 - f.t) * 36, 0, TAU);
@@ -349,6 +350,11 @@
     fctx.fillRect(30, -6, 10, 12);
     fctx.fillStyle = bright;
     fctx.beginPath(); fctx.arc(0, 0, 20, 0, TAU); fctx.fill(); fctx.stroke();
+    if (captured) { // a white ring marks a cannon that has changed hands
+      fctx.strokeStyle = '#fff';
+      fctx.lineWidth = 3;
+      fctx.beginPath(); fctx.arc(0, 0, 23, 0, TAU); fctx.stroke();
+    }
     fctx.lineWidth = 2;
     fctx.strokeStyle = 'rgba(0,0,0,0.55)';
     for (let k = 0; k < 6; k++) {
@@ -361,7 +367,7 @@
   }
 
   function drawLabels(i) {
-    const c = board.cannon[i];
+    const c = board.cannon[i], name = names[board.ownerOf(i)];
     fctx.textAlign = 'center';
     fctx.textBaseline = 'middle';
     fctx.lineJoin = 'round';
@@ -379,16 +385,16 @@
     // the name, shrunk to fit inside the block
     let size = 24;
     fctx.font = `700 ${size}px system-ui, sans-serif`;
-    const w = fctx.measureText(names[i]).width;
+    const w = fctx.measureText(name).width;
     if (w > 250) {
       size = Math.max(11, Math.floor((size * 250) / w));
       fctx.font = `700 ${size}px system-ui, sans-serif`;
     }
     fctx.lineWidth = 5;
     fctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    fctx.strokeText(names[i], c.x, c.y - 44);
+    fctx.strokeText(name, c.x, c.y - 44);
     fctx.fillStyle = '#fff';
-    fctx.fillText(names[i], c.x, c.y - 44);
+    fctx.fillText(name, c.x, c.y - 44);
   }
 
   // ---------------------------------------------------------------- leaderboard, clock, winner
@@ -398,24 +404,16 @@
     const mmss = `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
     return h ? `${h}:${mmss}` : mmss;
   }
-  // Eliminated colours take their balls off the board, which slows the endgame to a crawl.
-  // Speed the game up as colours drop out so the total number of shots per second stays roughly constant.
-  function endgameBoost() {
-    return Math.min(MAX_BOOST, Math.max(1, board.teamCount / Math.max(1, board.aliveCount)));
-  }
-
   function updateClock() {
     $('clock').textContent = fmtTime(board.time);
-    const boost = board.winner >= 0 ? 1 : endgameBoost();
-    $('boostStat').hidden = boost < 1.05;
-    $('boost').textContent = boost.toFixed(1);
   }
 
   function updateLeaderboard() {
     const total = board.owner.length;
+    const cannons = board.cannonCounts();
     const order = TEAMS.map((_, i) => i).sort((a, b) => {
       if (board.alive[a] !== board.alive[b]) return board.alive[a] ? -1 : 1;
-      return board.count[b] - board.count[a];
+      return board.count[b] - board.count[a] || cannons[b] - cannons[a];
     });
     const rows = order.map((i, rank) => {
       const li = document.createElement('li');
@@ -423,9 +421,12 @@
       const r = document.createElement('span'); r.className = 'lb-rank'; r.textContent = rank + 1;
       const sw = document.createElement('span'); sw.className = 'lb-sw'; sw.style.background = TEAMS[i].tile;
       const nm = document.createElement('span'); nm.className = 'lb-name'; nm.textContent = names[i]; nm.title = names[i];
+      const cn = document.createElement('span'); cn.className = 'lb-c';
+      cn.textContent = board.alive[i] ? `◎${cannons[i]}` : '';
+      cn.title = `${cannons[i]} cannon${cannons[i] === 1 ? '' : 's'}`;
       const n = document.createElement('span'); n.className = 'lb-n';
       n.textContent = board.alive[i] ? `${board.count[i]} · ${((board.count[i] / total) * 100).toFixed(1)}%` : 'out';
-      li.append(r, sw, nm, n);
+      li.append(r, sw, nm, cn, n);
       return li;
     });
     $('lbList').replaceChildren(...rows);

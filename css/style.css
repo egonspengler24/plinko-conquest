@@ -150,11 +150,12 @@ input[type=range] { width: 90px; accent-color: var(--accent); }
 .leaderboard { flex: none; width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; max-height: calc(100vh - 74px); overflow: auto; }
 .leaderboard h2 { font-size: 15px; margin-bottom: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .leaderboard ol { list-style: none; margin: 0; padding: 0; }
-.lb-row { display: grid; grid-template-columns: 22px 12px 1fr auto; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.lb-row { display: grid; grid-template-columns: 22px 12px 1fr auto auto; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .lb-rank { color: var(--muted); text-align: right; }
 .lb-sw { width: 12px; height: 12px; border-radius: 3px; }
 .lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-n { color: var(--muted); }
+.lb-c { color: var(--muted); font-size: 12px; }
+.lb-n { color: var(--muted); min-width: 84px; text-align: right; }
 .lb-row.out .lb-name { text-decoration: line-through; color: #666; }
 .lb-row.out .lb-n { color: #555; }
 
