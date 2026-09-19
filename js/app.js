@@ -388,7 +388,7 @@
     }
 
     for (const s of board.shots) {
-      const color = colors[s.team].bright, r = 7 * board.scale;
+      const color = colors[s.team].shot, r = 7 * board.scale;
       fctx.lineCap = 'round';
       fctx.strokeStyle = color;
       fctx.globalAlpha = 0.5;

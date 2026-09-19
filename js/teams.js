@@ -1,10 +1,11 @@
 // The colour palette. 24 solid colours (from the reference video) plus two animated ones:
 // Rainbow cycles through the hues, Monochrome fades from light grey through black and back.
 //
-// Each entry resolves to { tile, bright, ball }:
+// Each entry resolves to { tile, bright, ball, shot }:
 //   tile   - the colour of the owned squares
-//   bright - a lighter (or, for Monochrome, contrasting) version for cannons and shots
-//   ball   - the colour of the plinko ball; never black, so it always shows on the black board
+//   bright - the colour of the cannon: a lighter version of the tile (for Monochrome, a contrasting one)
+//   ball   - the colour of the plinko ball; vivid and never black, so it always shows on the black board
+//   shot   - the colour of the shots
 
 const SOLIDS = [
   ['Purple',     '#6b00b5'], ['Forest',   '#005a00'], ['Teal',    '#12b39a'], ['Tan',      '#a8865a'], ['Red',    '#d40000'], ['Green',  '#00a000'],
@@ -40,12 +41,21 @@ function brighten(hex) {
   return `hsl(${h.toFixed(0)}, ${Math.round(Math.max(s, 0.5) * (s < 0.05 ? 0 : 100))}%, ${Math.round(nl * 100)}%)`;
 }
 
+// The cannon colour. Most tiles are lifted to a light, vivid version of their own hue. But olive is just dark
+// yellow and brown is just dark orange, and lightening those a lot turns them into plain yellow and orange,
+// so dark yellows and oranges only get a small lift and stay recognisably olive and brown.
+function cannonColor(hex) {
+  const [h, s, l] = hexToHsl(hex);
+  if (h >= 15 && h <= 75 && l < 0.3) return `hsl(${h.toFixed(0)}, ${Math.round(s * 100)}%, ${Math.round((l + 0.1) * 100)}%)`;
+  return brighten(hex);
+}
+
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 const PALETTE = [
   ...SOLIDS.map(([label, tile]) => {
-    const bright = brighten(tile);
-    return { id: slug(label), label, kind: 'solid', tile, bright, ball: bright, css: tile };
+    const vivid = brighten(tile);
+    return { id: slug(label), label, kind: 'solid', tile, bright: cannonColor(tile), ball: vivid, shot: vivid, css: tile };
   }),
   { id: 'rainbow', label: 'Rainbow', kind: 'rainbow', css: 'linear-gradient(135deg, #ff2d2d, #ffa500, #ffe600, #2ecc40, #1e90ff, #8a2be2)' },
   { id: 'mono', label: 'Monochrome', kind: 'mono', css: 'linear-gradient(135deg, #e6e6e6, #808080, #000)' },
@@ -64,15 +74,17 @@ function resolveColor(entry, t) {
   if (entry.kind === 'rainbow') {
     const h = Math.round(((t / RAINBOW_PERIOD) * 360) % 360);
     const bright = `hsl(${h}, 95%, 72%)`;
-    return { tile: `hsl(${h}, 80%, 42%)`, bright, ball: bright };
+    return { tile: `hsl(${h}, 80%, 42%)`, bright, ball: bright, shot: bright };
   }
   if (entry.kind === 'mono') {
     const L = 0.44 + 0.44 * Math.cos((t / MONO_PERIOD) * Math.PI * 2); // 0.88 light grey -> 0 black -> back
     const grey = (x) => `hsl(0, 0%, ${(x * 100).toFixed(1)}%)`;
+    const contrast = L > 0.5 ? grey(0.1) : grey(0.9);   // always contrasts with the tile
     return {
       tile: grey(L),
-      bright: L > 0.5 ? grey(0.1) : grey(0.9),   // always contrasts with the tile
+      bright: contrast,
       ball: grey(0.28 + (0.62 * L) / 0.88),      // fades, but never disappears against the black board
+      shot: contrast,
     };
   }
   return entry;
