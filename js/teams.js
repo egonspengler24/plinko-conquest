@@ -1,14 +1,20 @@
-// The 24 teams, laid out row-major to match the 6x4 board.
-const TEAM_DEFS = [
+// The colour palette. 24 solid colours (from the reference video) plus two animated ones:
+// Rainbow cycles through the hues, Monochrome fades from light grey through black and back.
+//
+// Each entry resolves to { tile, bright, ball }:
+//   tile   - the colour of the owned squares
+//   bright - a lighter (or, for Monochrome, contrasting) version for cannons and shots
+//   ball   - the colour of the plinko ball; never black, so it always shows on the black board
+
+const SOLIDS = [
   ['Purple',     '#6b00b5'], ['Forest',   '#005a00'], ['Teal',    '#12b39a'], ['Tan',      '#a8865a'], ['Red',    '#d40000'], ['Green',  '#00a000'],
   ['Mint',       '#5aa85a'], ['Navy',     '#00007a'], ['Grey',    '#606060'], ['Indigo',   '#2f0a70'], ['Magenta','#b400b4'], ['Mustard','#a8a000'],
   ['Brown',      '#7a3a00'], ['Silver',   '#b0b0b0'], ['Plum',    '#5a0a66'], ['Periwinkle','#6a6ab0'], ['Olive',  '#5a5a00'], ['Cyan',   '#00b0b8'],
   ['Deep Teal',  '#006a6a'], ['Blue',     '#0000c8'], ['Orchid',  '#a860a8'], ['Salmon',   '#b86060'], ['Orange', '#d9730d'], ['Maroon', '#5a0000'],
 ];
 
-const TEAM_COUNT = TEAM_DEFS.length;
-const BOARD_BLOCKS_X = 6;
-const BOARD_BLOCKS_Y = 4;
+const RAINBOW_PERIOD = 8; // seconds for a full trip round the hues
+const MONO_PERIOD = 9;    // seconds for light grey -> black -> light grey
 
 function hexToHsl(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -34,6 +40,42 @@ function brighten(hex) {
   return `hsl(${h.toFixed(0)}, ${Math.round(Math.max(s, 0.5) * (s < 0.05 ? 0 : 100))}%, ${Math.round(nl * 100)}%)`;
 }
 
-const TEAMS = TEAM_DEFS.map(([label, tile]) => ({ label, tile, bright: brighten(tile) }));
+const slug = (label) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-if (typeof module !== 'undefined') module.exports = { TEAMS, TEAM_COUNT, BOARD_BLOCKS_X, BOARD_BLOCKS_Y };
+const PALETTE = [
+  ...SOLIDS.map(([label, tile]) => {
+    const bright = brighten(tile);
+    return { id: slug(label), label, kind: 'solid', tile, bright, ball: bright, css: tile };
+  }),
+  { id: 'rainbow', label: 'Rainbow', kind: 'rainbow', css: 'linear-gradient(135deg, #ff2d2d, #ffa500, #ffe600, #2ecc40, #1e90ff, #8a2be2)' },
+  { id: 'mono', label: 'Monochrome', kind: 'mono', css: 'linear-gradient(135deg, #e6e6e6, #808080, #000)' },
+];
+
+const PALETTE_BY_ID = Object.fromEntries(PALETTE.map((p) => [p.id, p]));
+
+// The default 6x4 line-up follows the reference video, except that Rainbow and Monochrome
+// take the places of the two near-duplicate neutrals (Silver and Grey).
+const DEFAULT_LINEUP = SOLIDS.map(([label]) => slug(label)).map((id) => (id === 'grey' ? 'mono' : id === 'silver' ? 'rainbow' : id));
+
+const isAnimated = (entry) => entry.kind !== 'solid';
+
+// The colours of an entry `t` seconds into the game. Solid entries never change.
+function resolveColor(entry, t) {
+  if (entry.kind === 'rainbow') {
+    const h = Math.round(((t / RAINBOW_PERIOD) * 360) % 360);
+    const bright = `hsl(${h}, 95%, 72%)`;
+    return { tile: `hsl(${h}, 80%, 42%)`, bright, ball: bright };
+  }
+  if (entry.kind === 'mono') {
+    const L = 0.44 + 0.44 * Math.cos((t / MONO_PERIOD) * Math.PI * 2); // 0.88 light grey -> 0 black -> back
+    const grey = (x) => `hsl(0, 0%, ${(x * 100).toFixed(1)}%)`;
+    return {
+      tile: grey(L),
+      bright: L > 0.5 ? grey(0.1) : grey(0.9),   // always contrasts with the tile
+      ball: grey(0.28 + (0.62 * L) / 0.88),      // fades, but never disappears against the black board
+    };
+  }
+  return entry;
+}
+
+if (typeof module !== 'undefined') module.exports = { PALETTE, PALETTE_BY_ID, DEFAULT_LINEUP, resolveColor, isAnimated };

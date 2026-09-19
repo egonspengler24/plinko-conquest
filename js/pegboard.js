@@ -7,10 +7,12 @@ const PEG_CFG = {
   height: 1120,
   ballR: 11,
   pegR: 18,
+  bumperR: 30,        // radius of the half-circle bumpers on the side walls
   rowGap: 72,
   firstRowY: 100,
   rows: 13,
   barH: 60,
+  gravity: 0.0022,    // Matter gravity scale (default 0.001); tuned so a ball takes about 5 s to fall
   substeps: 2,        // physics updates per game tick, to stop fast balls tunnelling through pegs
 };
 
@@ -21,7 +23,7 @@ class Pegboard {
     this.barTop = this.height - this.barH;
     this.onLand = null;              // (team, 'x2' | 'R') => void
     this.barFlash = { x2: 0, R: 0 };
-    this.engine = Matter.Engine.create({ gravity: { x: 0, y: 1, scale: 0.001 } });
+    this.engine = Matter.Engine.create({ gravity: { x: 0, y: 1, scale: this.gravity } });
     this.buildStatics();
     this.balls = [];
     this.reset();
@@ -37,6 +39,14 @@ class Pegboard {
       for (const x of xs) this.pegs.push({ x, y });
     }
     for (const p of this.pegs) statics.push(Bodies.circle(p.x, p.y, this.pegR, { isStatic: true, restitution: 0.6, friction: 0 }));
+    // Half-circle bumpers on both side walls, on the rows that have no peg near the wall, so a ball can't
+    // slide straight down the wall. (A full circle centred on the wall is a half circle inside the board.)
+    this.bumpers = [];
+    for (let r = 1; r <= this.rows; r += 2) {
+      const y = this.firstRowY + r * this.rowGap;
+      this.bumpers.push({ x: 0, y, side: 'left' }, { x: W, y, side: 'right' });
+    }
+    for (const b of this.bumpers) statics.push(Bodies.circle(b.x, b.y, this.bumperR, { isStatic: true, restitution: 0.6, friction: 0 }));
     // walls run far above the board so balls queued above the top are contained
     statics.push(Bodies.rectangle(-30, this.height / 2 - 2500, 60, this.height + 5000, { isStatic: true }));
     statics.push(Bodies.rectangle(W + 30, this.height / 2 - 2500, 60, this.height + 5000, { isStatic: true }));
@@ -103,6 +113,13 @@ class Pegboard {
     for (const p of this.pegs) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, this.pegR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const b of this.bumpers) {
+      ctx.beginPath();
+      if (b.side === 'left') ctx.arc(b.x, b.y, this.bumperR, -Math.PI / 2, Math.PI / 2);
+      else ctx.arc(b.x, b.y, this.bumperR, Math.PI / 2, Math.PI * 1.5);
+      ctx.closePath();
       ctx.fill();
     }
     // bottom bar: x2 | R
